@@ -1,0 +1,55 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.2 and export templates
+        run: |
+          curl -sL -o godot.zip https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -o -q godot.zip && chmod +x Godot_v4.7.2-stable_linux.x86_64
+          curl -sL -o templates.tpz https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          unzip -o -q templates.tpz -d /tmp/tpl
+          mv /tmp/tpl/templates "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+
+      - name: Create debug keystore
+        run: |
+          keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Point export preset at keystore
+        run: sed -i "s|__KEYSTORE_PATH__|$PWD/debug.keystore|g" export_presets.cfg
+
+      - name: Import project assets
+        run: |
+          export GODOT_SILENCE_ROOT_WARNING=1
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --import .
+          mkdir -p builds
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --export-release "Android" builds/battle-royale.apk .
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: battle-royale-apk
+          path: builds/*.apk
+
+      - name: Publish APK to Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk
+          name: Latest APK
+          body: "Download battle-royale.apk, copy it to your phone and install it (allow 'Install unknown apps' when asked)."
+          files: builds/battle-royale.apk
