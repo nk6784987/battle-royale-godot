@@ -15,7 +15,7 @@ func _gui_input(ev: InputEvent) -> void:
 			Controls.move_vec = Vector2.ZERO
 			queue_redraw()
 	elif ev is InputEventScreenDrag and ev.index == _idx:
-		var v := (ev.position - _center) / 110.0
+		var v: Vector2 = (ev.position - _center) / 110.0
 		if v.length() > 1.0:
 			v = v.normalized()
 		Controls.move_vec = Vector2(v.x, -v.y)
